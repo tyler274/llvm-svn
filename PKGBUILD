@@ -15,6 +15,7 @@ pkgname=(
     'llvm-svn'
     'llvm-libs-svn'
     'llvm-ocaml-svn'
+    'lldb-svn'
     'clang-svn'
     'clang-analyzer-svn'
     'clang-compiler-rt-svn'
@@ -49,10 +50,12 @@ source=(
     'clang-tools-extra::svn+http://llvm.org/svn/llvm-project/clang-tools-extra/trunk'
     'compiler-rt::svn+http://llvm.org/svn/llvm-project/compiler-rt/trunk'
     'lld::svn+http://llvm.org/svn/llvm-project/lld/trunk'
+    'lldb::svn+http://llvm.org/svn/llvm-project/lldb/trunk'
     'llvm-Config-llvm-config.h'
 )
 
 sha256sums=(
+    'SKIP'
     'SKIP'
     'SKIP'
     'SKIP'
@@ -110,6 +113,7 @@ _install_licenses() {
     find "${1}" \
         \( \
             -path "${srcdir}/${_pkgname}/tools/clang" -o \
+            -path "${srcdir}/${_pkgname}/tools/lldb" -o \
             -path "${srcdir}/${_pkgname}/projects/compiler-rt" \
         \) -prune -o \
         \( \
@@ -149,6 +153,7 @@ prepare() {
     svn export --force "${srcdir}/clang-tools-extra" tools/clang/tools/extra
     svn export --force "${srcdir}/compiler-rt" projects/compiler-rt
     svn export --force "${srcdir}/lld" tools/lld
+    svn export --force "${srcdir}/lldb" tools/lldb
 
     mkdir -p "${srcdir}/build"
 }
@@ -216,9 +221,9 @@ package_llvm-svn() {
 
     cd "${srcdir}/build"
 
-    # Exclude the clang directory, since it'll be installed in a separate package
-    sed -i \
-        "s|^\([[:blank:]]*include(\"${srcdir}/build/tools/clang/cmake_install.cmake\")\)$|#\1|" \
+    # Exclude the lldb and clang directories, since they will be installed in a separate package
+    sed -E -i \
+        "s|^([[:blank:]]*include\(\"${srcdir}/build/tools/)(clang\|lldb)(/cmake_install.cmake\"\))$|#&|" \
         tools/cmake_install.cmake
 
     make DESTDIR="${pkgdir}" install
@@ -302,6 +307,31 @@ package_llvm-ocaml-svn() {
     cp -a "${srcdir}/ocaml.doc" "${pkgdir}/usr/share/doc/llvm/ocaml-html"
 
     _install_licenses "${srcdir}/llvm"
+}
+
+package_lldb-svn() {
+    pkgdesc='Next generation, high-performance debugger'
+    url='http://lldb.llvm.org/'
+    depends=(
+        "llvm-libs-svn=${pkgver}-${pkgrel}"
+        'libedit'
+        'libxml2'
+        'python2'
+    )
+    groups=('llvm-toolchain-svn')
+    provides=('lldb')
+    conflicts=('lldb')
+
+    cd "${srcdir}/build/tools/lldb"
+
+    make DESTDIR="${pkgdir}" install
+
+    _fix_python_exec_path \
+        "${pkgdir}${_py_sitepkg_dir}/lldb/utils/symbolication.py"
+
+    _compile_python_files "${pkgdir}${_py_sitepkg_dir}/lldb"
+
+    _install_licenses "${srcdir}/lldb"
 }
 
 package_clang-svn() {
